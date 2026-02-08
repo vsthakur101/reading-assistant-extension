@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 300px;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .header h2 {
+      margin: 0;
+      font-size: 18px;
+      color: #333;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    .section h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: #666;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      width: 100%;
+      margin-bottom: 8px;
+      transition: background 0.2s;
+    }
+    .button:hover {
+      background: #0056b3;
+    }
+    .button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .button.secondary {
+      background: #6c757d;
+    }
+    .button.secondary:hover {
+      background: #545b62;
+    }
+    .difficulty-slider {
+      width: 100%;
+      margin: 10px 0;
+    }
+    .difficulty-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #666;
+      margin-top: 5px;
+    }
+    .api-key-section {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      margin-top: 20px;
+    }
+    .api-key-input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-top: 5px;
+    }
+    .status {
+      font-size: 12px;
+      color: #666;
+      margin-top: 10px;
+      padding: 8px;
+      border-radius: 4px;
+      background: #f0f0f0;
+    }
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+    }
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>📖 Reading Assistant</h2>
+  </div>
+
+  <div class="section">
+    <h3>Quick Actions</h3>
+    <button class="button" id="summarizeBtn">Summarize Article</button>
+    <button class="button secondary" id="explainBtn">Explain Selected Text</button>
+  </div>
+
+  <div class="section">
+    <h3>Reading Difficulty</h3>
+    <input type="range" class="difficulty-slider" id="difficultySlider" min="1" max="5" value="3">
+    <div class="difficulty-labels">
+      <span>Easy</span>
+      <span>Medium</span>
+      <span>Hard</span>
+    </div>
+    <button class="button" id="adjustDifficultyBtn">Adjust Reading Level</button>
+  </div>
+
+  <div class="api-key-section">
+    <h3>API Settings</h3>
+    <select id="providerSelect" class="api-key-input">
+      <option value="claude">Claude (Anthropic)</option>
+      <option value="openai">OpenAI GPT</option>
+    </select>
+    <input type="password" id="apiKeyInput" class="api-key-input" placeholder="Enter API key">
+    <button class="button" id="saveKeyBtn">Save API Key</button>
+  </div>
+
+  <div id="status" class="status" style="display: none;"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
