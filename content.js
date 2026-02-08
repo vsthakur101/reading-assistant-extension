@@ -1,4 +1,10 @@
-class ReadingAssistant {
+(() => {
+  if (window.__readingAssistantInitialized) {
+    return;
+  }
+  window.__readingAssistantInitialized = true;
+
+  class ReadingAssistant {
   constructor() {
     this.apiKey = null;
     this.provider = null;
@@ -19,6 +25,17 @@ class ReadingAssistant {
 
     // Setup event listeners
     this.setupEventListeners();
+
+    // Listen for settings changes
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'sync') return;
+      if (changes.apiKey) {
+        this.apiKey = changes.apiKey.newValue;
+      }
+      if (changes.provider) {
+        this.provider = changes.provider.newValue || 'claude';
+      }
+    });
   }
 
   createOverlayElements() {
@@ -76,11 +93,6 @@ class ReadingAssistant {
   }
 
   async summarizeArticle() {
-    if (!this.apiKey) {
-      this.showError('Please set your API key in the extension settings');
-      return;
-    }
-
     const articleText = this.extractArticleText();
     if (!articleText) {
       this.showError('Could not find article content to summarize');
@@ -90,7 +102,16 @@ class ReadingAssistant {
     this.showLoading('Summarizing article...');
     
     try {
-      const summary = await this.callAPI(`Please summarize this article in 3-4 bullet points:\n\n${articleText}`);
+      let summary;
+      if (this.provider === 'local') {
+        summary = this.localSummarize(articleText);
+      } else {
+        if (!this.apiKey) {
+          this.showError('Please set your API key in the extension settings');
+          return;
+        }
+        summary = await this.callAPI(`Please summarize this article in 3-4 bullet points:\n\n${articleText}`);
+      }
       this.showResult('Article Summary', summary);
     } catch (error) {
       this.showError('Failed to summarize article: ' + error.message);
@@ -100,6 +121,11 @@ class ReadingAssistant {
   async explainSelectedText() {
     if (!this.selectedText) {
       this.showError('Please select some text to explain');
+      return;
+    }
+
+    if (this.provider === 'local') {
+      this.showError('Explanation requires an API provider. Choose Claude or OpenAI.');
       return;
     }
 
@@ -119,6 +145,11 @@ class ReadingAssistant {
   }
 
   async adjustReadingDifficulty(level) {
+    if (this.provider === 'local') {
+      this.showError('Adjusting reading difficulty requires an API provider. Choose Claude or OpenAI.');
+      return;
+    }
+
     if (!this.apiKey) {
       this.showError('Please set your API key in the extension settings');
       return;
@@ -177,6 +208,71 @@ class ReadingAssistant {
         }
       );
     });
+  }
+
+  localSummarize(text) {
+    const cleaned = text
+      .replace(/\s+/g, ' ')
+      .replace(/\n+/g, ' ')
+      .trim();
+
+    if (!cleaned) {
+      return 'No content to summarize.';
+    }
+
+    const sentences = cleaned
+      .split(/(?<=[.!?])\s+/)
+      .filter(Boolean);
+
+    const stopwords = new Set([
+      'the', 'a', 'an', 'and', 'or', 'but', 'if', 'then', 'than', 'so', 'to', 'of', 'in', 'on', 'for', 'with', 'at', 'by',
+      'from', 'up', 'down', 'out', 'over', 'under', 'again', 'further', 'once', 'here', 'there', 'when', 'where', 'why', 'how',
+      'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same',
+      'so', 'than', 'too', 'very', 'can', 'will', 'just', 'don', 'should', 'now', 'is', 'are', 'was', 'were', 'be', 'been',
+      'being', 'have', 'has', 'had', 'do', 'does', 'did', 'this', 'that', 'these', 'those', 'it', 'its', 'as', 'into', 'about'
+    ]);
+
+    const wordCounts = new Map();
+    const words = cleaned
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .split(/\s+/)
+      .filter(Boolean)
+      .filter((word) => !stopwords.has(word) && word.length > 2);
+
+    for (const word of words) {
+      wordCounts.set(word, (wordCounts.get(word) || 0) + 1);
+    }
+
+    const sentenceScores = sentences.map((sentence, index) => {
+      const sentenceWords = sentence
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .split(/\s+/)
+        .filter(Boolean);
+
+      let score = 0;
+      for (const word of sentenceWords) {
+        if (wordCounts.has(word)) {
+          score += wordCounts.get(word);
+        }
+      }
+
+      return { index, sentence, score };
+    });
+
+    const targetCount = Math.min(4, Math.max(3, Math.round(sentences.length * 0.2)));
+    const topSentences = sentenceScores
+      .sort((a, b) => b.score - a.score)
+      .slice(0, targetCount)
+      .sort((a, b) => a.index - b.index)
+      .map((item) => `• ${item.sentence.trim()}`);
+
+    if (topSentences.length === 0) {
+      return 'No content to summarize.';
+    }
+
+    return topSentences.join('\n');
   }
 
   extractArticleText() {
@@ -307,7 +403,8 @@ class ReadingAssistant {
       tempDiv.remove();
     }, 3000);
   }
-}
+  }
 
-// Initialize the reading assistant
-new ReadingAssistant();
+  // Initialize the reading assistant
+  new ReadingAssistant();
+})();

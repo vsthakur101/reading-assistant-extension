@@ -43,35 +43,77 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
-  // Summarize article
-  summarizeBtn.addEventListener('click', function() {
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-      chrome.tabs.sendMessage(tabs[0].id, {
-        action: 'summarize'
+  // Persist provider selection changes
+  providerSelect.addEventListener('change', function() {
+    const provider = providerSelect.value;
+    chrome.storage.sync.set({ provider }, function() {
+      showStatus(`Provider set to ${provider}`);
+    });
+  });
+
+  async function ensureContentScript(tabId) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ['content.js']
+      });
+      await chrome.scripting.insertCSS({
+        target: { tabId },
+        files: ['content.css']
+      });
+    } catch (error) {
+      throw new Error(error?.message || 'Failed to inject content script');
+    }
+  }
+
+  function sendMessageToTab(tabId, message) {
+    return new Promise((resolve, reject) => {
+      chrome.tabs.sendMessage(tabId, message, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        resolve(response);
       });
     });
-    window.close();
+  }
+
+  async function sendAction(action, payload = {}) {
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = tabs && tabs[0];
+
+      if (!tab || !tab.id) {
+        showStatus('No active tab found', true);
+        return;
+      }
+
+      try {
+        await sendMessageToTab(tab.id, { action, ...payload });
+      } catch (error) {
+        // Try injecting content script if it's not available in the page
+        await ensureContentScript(tab.id);
+        await sendMessageToTab(tab.id, { action, ...payload });
+      }
+    } catch (error) {
+      showStatus(error?.message || 'Failed to send action', true);
+      return;
+    }
+  }
+
+  // Summarize article
+  summarizeBtn.addEventListener('click', function() {
+    sendAction('summarize');
   });
 
   // Explain selected text
   explainBtn.addEventListener('click', function() {
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-      chrome.tabs.sendMessage(tabs[0].id, {
-        action: 'explain'
-      });
-    });
-    window.close();
+    sendAction('explain');
   });
 
   // Adjust reading difficulty
   adjustDifficultyBtn.addEventListener('click', function() {
     const difficulty = difficultySlider.value;
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-      chrome.tabs.sendMessage(tabs[0].id, {
-        action: 'adjustDifficulty',
-        difficulty: difficulty
-      });
-    });
-    window.close();
+    sendAction('adjustDifficulty', { difficulty });
   });
 });
