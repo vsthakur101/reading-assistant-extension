@@ -154,47 +154,29 @@ class ReadingAssistant {
   }
 
   async callAPI(prompt) {
-    const endpoint = this.provider === 'claude' 
-      ? 'https://api.anthropic.com/v1/messages'
-      : 'https://api.openai.com/v1/chat/completions';
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        {
+          action: 'makeAPICall',
+          provider: this.provider,
+          apiKey: this.apiKey,
+          prompt
+        },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
 
-    const headers = {
-      'Content-Type': 'application/json',
-    };
+          if (!response || !response.success) {
+            reject(new Error(response?.error || 'Unknown error'));
+            return;
+          }
 
-    const body = this.provider === 'claude' 
-      ? {
-          model: 'claude-3-haiku-20240307',
-          max_tokens: 1000,
-          messages: [{ role: 'user', content: prompt }]
+          resolve(response.result);
         }
-      : {
-          model: 'gpt-3.5-turbo',
-          max_tokens: 1000,
-          messages: [{ role: 'user', content: prompt }]
-        };
-
-    if (this.provider === 'claude') {
-      headers['x-api-key'] = this.apiKey;
-      headers['anthropic-version'] = '2023-06-01';
-    } else {
-      headers['Authorization'] = `Bearer ${this.apiKey}`;
-    }
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body)
+      );
     });
-
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return this.provider === 'claude' 
-      ? data.content[0].text
-      : data.choices[0].message.content;
   }
 
   extractArticleText() {
